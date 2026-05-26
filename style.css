@@ -971,6 +971,20 @@ textarea { resize: vertical; }
 
 .map-search-btn, .map-locate-btn { white-space: nowrap; padding: 9px 18px; }
 
+.map-retry-btn {
+  background: none;
+  border: 1px solid currentColor;
+  color: var(--shallow);
+  border-radius: 999px;
+  padding: 2px 12px;
+  font-size: .78rem;
+  cursor: pointer;
+  font-family: inherit;
+  margin-left: 8px;
+  transition: background .15s;
+}
+.map-retry-btn:hover { background: var(--blue-pale); }
+
 #map {
   max-width: 860px;
   width: 100%;

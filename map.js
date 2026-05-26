@@ -1,9 +1,11 @@
 // ── Dive Map ──────────────────────────────────────────────────────────────────
 
-// Two public Overpass endpoints — try in order if one is busy/down.
+// Public Overpass mirrors — tried in order until one succeeds.
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://overpass.osm.ch/api/interpreter',
 ];
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 
@@ -96,8 +98,10 @@ async function fetchDiveLocations(lat, lon) {
 );
 out center;`.trim();
 
-  // Try each Overpass endpoint in order.
+  // Try each Overpass endpoint in order, with a per-endpoint timeout.
   for (const endpoint of OVERPASS_ENDPOINTS) {
+    // Combine the user-abort signal with a 20 s per-endpoint timeout.
+    const timeoutId = setTimeout(() => fetchController.abort(), 20000);
     try {
       const res = await fetch(endpoint, {
         method:  'POST',
@@ -105,6 +109,7 @@ out center;`.trim();
         body:    'data=' + encodeURIComponent(query),
         signal:  fetchController.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -113,13 +118,23 @@ out center;`.trim();
       renderMarkers();
       return; // success — stop trying other endpoints
     } catch (err) {
-      if (err.name === 'AbortError') return; // user navigated away
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        // If the user navigated away the controller is permanently aborted —
+        // reset it so the next manual retry can create a fresh one.
+        fetchController = null;
+        return;
+      }
       console.warn('[Dive Map] endpoint failed:', endpoint, err.message);
-      // fall through to try the next endpoint
+      // Reset controller so the next endpoint gets a fresh signal.
+      fetchController = new AbortController();
     }
   }
 
-  setMapStatus('Could not load locations — both map servers are unavailable. Try again in a moment.');
+  setMapStatus(
+    'Could not load locations — all map servers are currently busy. ' +
+    '<button class="map-retry-btn" onclick="fetchFromMapCenter()">↺ Retry</button>'
+  );
 }
 
 // ── Classification & icons ────────────────────────────────────────────────────
@@ -280,7 +295,7 @@ function copyMapAddress(btn, encoded) {
 
 function setMapStatus(msg) {
   const el = document.getElementById('map-status');
-  if (el) el.textContent = msg;
+  if (el) el.innerHTML = msg;
 }
 
 function esc(str) {
