@@ -61,6 +61,10 @@ let gear = [];
 let activeProfileFilter = new Set(); // empty = show all
 let editingId = null;     // id of item being edited, null = add mode
 let formReminders = [];   // reminders staged in the add/edit form
+let activeSortOption = 'default';
+let bulkSelected     = new Set();
+let calendarYear     = new Date().getFullYear();
+let calendarMonth    = new Date().getMonth();
 
 function gearKey() {
   return 'diveGear_' + (getCurrentUser() || 'guest');
@@ -261,11 +265,16 @@ function renderGear(items) {
 
   gearList.innerHTML = items.map(item => {
     const profileName = getProfileName(item.profileId);
-    const isBroken = item.condition === 'Broken/Malfunction';
+    const isBroken    = item.condition === 'Broken/Malfunction';
+    const isSelected  = bulkSelected.has(item.id);
+    const hasHistory  = item.serviceHistory?.length > 0;
     return `
-    <div class="gear-item${isBroken ? ' broken' : ''}" data-id="${item.id}" onclick="openModal('${item.id}')" title="Click for maintenance guide">
+    <div class="gear-item${isBroken ? ' broken' : ''}${isSelected ? ' bulk-selected' : ''}" data-id="${item.id}" onclick="openModal('${item.id}')" title="Click for maintenance guide">
       <div class="gear-item-main">
         <div class="gear-item-title">
+          <label class="bulk-check-wrap" onclick="event.stopPropagation()">
+            <input type="checkbox" class="bulk-checkbox" data-id="${item.id}" ${isSelected ? 'checked' : ''} onchange="toggleBulkSelect(event,'${item.id}')" />
+          </label>
           ${escapeHTML(item.name)}
           <span class="condition-pill ${conditionClass(item.condition)}">${escapeHTML(item.condition)}</span>
           ${profileName ? `<span class="profile-badge">${escapeHTML(profileName)}</span>` : ''}
@@ -286,6 +295,15 @@ function renderGear(items) {
         ${isBroken
           ? `<div class="gear-item-meta"><div class="repair-badge">🔴 In Need of Repair</div></div>`
           : (item.nextService ? `<div class="gear-item-meta">${serviceStatus(item.nextService, item.category)}</div>` : '')}
+        ${hasHistory ? `
+          <div class="service-history" onclick="event.stopPropagation()">
+            <button class="service-history-toggle" onclick="toggleServiceHistory(event,'${item.id}')">
+              📋 Service History (${item.serviceHistory.length})
+            </button>
+            <div class="service-history-list" id="svc-hist-${item.id}">
+              ${[...item.serviceHistory].reverse().map(d => `<div class="svc-hist-entry">✅ ${formatDate(d)}</div>`).join('')}
+            </div>
+          </div>` : ''}
         ${item.notes ? `<div class="gear-item-notes">${escapeHTML(item.notes)}</div>` : ''}
       </div>
       <div class="gear-item-actions" onclick="event.stopPropagation()">
@@ -311,7 +329,9 @@ function updateUI() {
       return item.profileId && activeProfileFilter.has(item.profileId);
     });
   }
+  filtered = sortGear(filtered);
   gearCount.textContent = gear.length;
+  updateStatsCard();
   renderGear(filtered);
 }
 
@@ -427,6 +447,8 @@ function markServiced(id) {
   const item = gear.find(g => g.id === id);
   if (!item) return;
   const today = new Date().toISOString().split('T')[0];
+  item.serviceHistory = item.serviceHistory || [];
+  item.serviceHistory.push(today);
   item.lastService = today;
   item.nextService = calcNextService(item.category, today, item.purchaseDate);
   if (item.condition === 'Needs Service' || item.condition === 'Broken/Malfunction') item.condition = 'Good';
@@ -509,3 +531,207 @@ form.addEventListener('submit', e => {
 });
 
 searchInput.addEventListener('input', updateUI);
+
+// ── Sort ──────────────────────────────────────────────────────────────────────
+
+const CONDITION_ORDER = {
+  'Broken/Malfunction': 0,
+  'Needs Service': 1,
+  'Fair': 2,
+  'Good': 3,
+  'Excellent': 4,
+  'New': 5,
+};
+
+function sortGear(items) {
+  const sorted = [...items];
+  switch (activeSortOption) {
+    case 'name-asc':
+      return sorted.sort((a, b) => a.name.localeCompare(b.name));
+    case 'name-desc':
+      return sorted.sort((a, b) => b.name.localeCompare(a.name));
+    case 'condition':
+      return sorted.sort((a, b) => (CONDITION_ORDER[a.condition] ?? 3) - (CONDITION_ORDER[b.condition] ?? 3));
+    case 'next-service':
+      return sorted.sort((a, b) => {
+        const da = a.nextService || '9999-12-31';
+        const db = b.nextService || '9999-12-31';
+        return da < db ? -1 : da > db ? 1 : 0;
+      });
+    case 'purchase-date':
+      return sorted.sort((a, b) => {
+        const da = a.purchaseDate || '0000-00-00';
+        const db = b.purchaseDate || '0000-00-00';
+        return db > da ? 1 : db < da ? -1 : 0; // newest first
+      });
+    default:
+      return sorted;
+  }
+}
+
+function setSort(value) {
+  activeSortOption = value;
+  updateUI();
+}
+
+// ── Stats card ────────────────────────────────────────────────────────────────
+
+function updateStatsCard() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let overdue = 0, soon = 0, broken = 0;
+  gear.forEach(item => {
+    if (item.condition === 'Broken/Malfunction') broken++;
+    if (item.nextService) {
+      const due = new Date(item.nextService);
+      const diff = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+      if (diff < 0) overdue++;
+      else if (diff <= 30) soon++;
+    }
+  });
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setEl('stat-total',   gear.length);
+  setEl('stat-overdue', overdue);
+  setEl('stat-soon',    soon);
+  setEl('stat-broken',  broken);
+}
+
+// ── Service history toggle ────────────────────────────────────────────────────
+
+function toggleServiceHistory(event, itemId) {
+  event.stopPropagation();
+  const hist = document.getElementById('svc-hist-' + itemId);
+  if (hist) hist.classList.toggle('open');
+}
+
+// ── Bulk actions ──────────────────────────────────────────────────────────────
+
+function toggleBulkSelect(event, id) {
+  event.stopPropagation();
+  bulkSelected.has(id) ? bulkSelected.delete(id) : bulkSelected.add(id);
+  updateBulkBar();
+  const card = document.querySelector(`.gear-item[data-id="${id}"]`);
+  if (card) card.classList.toggle('bulk-selected', bulkSelected.has(id));
+}
+
+function updateBulkBar() {
+  const bar     = document.getElementById('bulk-action-bar');
+  const countEl = document.getElementById('bulk-count');
+  if (!bar) return;
+  const n = bulkSelected.size;
+  bar.classList.toggle('hidden', n === 0);
+  if (countEl) countEl.textContent = `${n} item${n !== 1 ? 's' : ''} selected`;
+  const sel = document.getElementById('bulk-profile-select');
+  if (sel) {
+    sel.innerHTML = '<option value="">— Assign profile —</option>' +
+      getProfiles().map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('') +
+      '<option value="__none__">Remove profile</option>';
+  }
+}
+
+function clearBulkSelection() {
+  bulkSelected.clear();
+  updateBulkBar();
+  updateUI();
+}
+
+function bulkDelete() {
+  const n = bulkSelected.size;
+  if (!n) return;
+  if (!confirm(`Delete ${n} item${n !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+  gear = gear.filter(item => !bulkSelected.has(item.id));
+  bulkSelected.clear();
+  saveGear();
+  renderProfileFilter();
+  updateBulkBar();
+  updateUI();
+}
+
+function bulkReassign() {
+  const sel = document.getElementById('bulk-profile-select');
+  if (!sel || !sel.value) return;
+  const profileId = sel.value === '__none__' ? null : sel.value;
+  gear.forEach(item => { if (bulkSelected.has(item.id)) item.profileId = profileId; });
+  bulkSelected.clear();
+  saveGear();
+  renderProfileFilter();
+  updateBulkBar();
+  updateUI();
+}
+
+// ── Service calendar ──────────────────────────────────────────────────────────
+
+const MONTH_NAMES = ['January','February','March','April','May','June',
+                     'July','August','September','October','November','December'];
+const DAY_NAMES_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+let selectedCalDay = null;
+
+function calNavMonth(delta) {
+  calendarMonth += delta;
+  if (calendarMonth > 11) { calendarMonth = 0; calendarYear++; }
+  if (calendarMonth < 0)  { calendarMonth = 11; calendarYear--; }
+  selectedCalDay = null;
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const labelEl = document.getElementById('calendar-month-label');
+  const gridEl  = document.getElementById('calendar-grid');
+  if (!labelEl || !gridEl) return;
+
+  labelEl.textContent = `${MONTH_NAMES[calendarMonth]} ${calendarYear}`;
+
+  // Build map: day-of-month → items due that day
+  const dateMap = {};
+  gear.forEach(item => {
+    if (!item.nextService) return;
+    const parts = item.nextService.split('-').map(Number);
+    if (parts[0] === calendarYear && (parts[1] - 1) === calendarMonth) {
+      const d = parts[2];
+      if (!dateMap[d]) dateMap[d] = [];
+      dateMap[d].push(item);
+    }
+  });
+
+  const firstDay    = new Date(calendarYear, calendarMonth, 1).getDay();
+  const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+  const todayStr    = new Date().toISOString().split('T')[0];
+
+  let html = `<div class="cal-day-headers">${DAY_NAMES_SHORT.map(d => `<div class="cal-header">${d}</div>`).join('')}</div><div class="cal-body">`;
+  for (let i = 0; i < firstDay; i++) html += '<div class="cal-cell empty"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds  = `${calendarYear}-${String(calendarMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const its = dateMap[d] || [];
+    let cls = 'cal-cell';
+    if (ds === todayStr)       cls += ' today';
+    if (its.length)            cls += ' has-items';
+    if (selectedCalDay === d)  cls += ' selected';
+    html += `<div class="${cls}" onclick="selectCalDay(${d})">${d}${its.length ? '<span class="cal-dot"></span>' : ''}</div>`;
+  }
+  html += '</div>';
+  gridEl.innerHTML = html;
+  renderCalendarDetail(selectedCalDay);
+}
+
+function selectCalDay(d) {
+  selectedCalDay = (selectedCalDay === d) ? null : d;
+  renderCalendar();
+}
+
+function renderCalendarDetail(d) {
+  const detailEl = document.getElementById('calendar-detail');
+  if (!detailEl) return;
+  if (!d) { detailEl.innerHTML = ''; return; }
+  const ds = `${calendarYear}-${String(calendarMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  const items = gear.filter(item => item.nextService === ds);
+  if (!items.length) { detailEl.innerHTML = ''; return; }
+  detailEl.innerHTML = `
+    <div class="cal-detail-header">📅 ${formatDate(ds)} — ${items.length} item${items.length !== 1 ? 's' : ''} due for service</div>
+    ${items.map(item => `
+      <div class="cal-detail-item">
+        <span class="cal-detail-name">${escapeHTML(item.name)}</span>
+        <span class="condition-pill ${conditionClass(item.condition)}">${escapeHTML(item.condition)}</span>
+        ${getProfileName(item.profileId) ? `<span class="profile-badge">${escapeHTML(getProfileName(item.profileId))}</span>` : ''}
+      </div>`).join('')}
+  `;
+}
