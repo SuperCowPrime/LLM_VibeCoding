@@ -20,7 +20,7 @@ const EMAILJS_CONFIG = {
   publicKey:        'ZNzs5ZWX2I4JCtOP0',   // Account → General → Public Key
   serviceId:        'service_xe6n7dr',      // Email Services → <your service> → Service ID
   templateId:       'template_cmh1f9g',     // Email Templates → service reminder template
-  resetTemplateId:  'YOUR_RESET_TEMPLATE_ID', // Email Templates → password reset template
+  resetTemplateId:  'template_bb3u2io', // Email Templates → password reset template
   //
   // Password-reset template variables:
   //   {{to_email}}   – recipient address
