@@ -30,8 +30,12 @@ const EMAILJS_CONFIG = {
 };
 
 (function initEmailJS() {
-  if (typeof emailjs === 'undefined') return;
+  if (typeof emailjs === 'undefined') {
+    console.warn('[Dive Gear] EmailJS library not loaded.');
+    return;
+  }
   emailjs.init({ publicKey: EMAILJS_CONFIG.publicKey });
+  console.info('[Dive Gear] EmailJS initialised. Reset template ready:', resetEmailReady());
 })();
 
 function emailjsReady() {

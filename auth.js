@@ -170,28 +170,33 @@ async function submitForgotStep1() {
   if (!result.ok) { errorEl.textContent = result.error; return; }
 
   const { code, email } = result;
-  let sentViaEmail = false;
+  let statusMsg = '';
 
   btn.disabled = true;
   btn.textContent = 'Sending…';
 
-  if (email && typeof sendResetEmail === 'function') {
+  if (!email) {
+    // Account has no email registered (created before v1.0)
+    console.info('[Dive Gear] No email on account — showing code on screen.');
+    statusMsg = `No email address is registered with this account.<br>Your reset code is: <strong class="reset-code-inline">${code}</strong>`;
+  } else if (typeof sendResetEmail !== 'function' || !resetEmailReady()) {
+    // EmailJS not loaded or reset template not configured
+    console.info('[Dive Gear] EmailJS/reset template not ready — showing code on screen.');
+    statusMsg = `Email sending is not set up.<br>Your reset code is: <strong class="reset-code-inline">${code}</strong>`;
+  } else {
     try {
       await sendResetEmail(email, username, code);
-      sentViaEmail = true;
+      statusMsg = `A 6-digit code was sent to <strong>${maskEmail(email)}</strong>. It expires in 15 minutes.`;
     } catch (e) {
-      console.warn('[Dive Gear] Reset email failed:', e);
+      console.warn('[Dive Gear] Reset email send failed:', e);
+      statusMsg = `Could not send email (${e?.text || e?.message || 'unknown error'}).<br>Your reset code is: <strong class="reset-code-inline">${code}</strong>`;
     }
   }
 
   btn.disabled = false;
   btn.textContent = 'Send Reset Code';
 
-  const msgEl = document.getElementById('forgot-sent-msg');
-  msgEl.innerHTML = sentViaEmail
-    ? `A 6-digit code was sent to <strong>${maskEmail(email)}</strong>. It expires in 15 minutes.`
-    : `EmailJS is not configured — your reset code is: <strong class="reset-code-inline">${code}</strong>`;
-
+  document.getElementById('forgot-sent-msg').innerHTML = statusMsg;
   document.getElementById('forgot-step-1').classList.add('hidden');
   document.getElementById('forgot-step-2').classList.remove('hidden');
   document.getElementById('forgot-code').value = '';
