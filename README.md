@@ -7,21 +7,44 @@ No installation or server required — just open `index.html` in any browser.
 
 ## Features
 
+### Equipment Management
 - **User accounts** — register and log in with a username and password; each user's gear is stored separately
-- **Profiles** — each user can create multiple named profiles (e.g. "Recreational", "Tech", "Photography"); equipment is assigned to a profile when added
+- **Profiles** — create multiple named profiles (e.g. "Recreational", "Tech", "Photography"); equipment is assigned to a profile when added
 - **Profile filter** — toggle one, multiple, or all profiles to filter the gear list; an "Unassigned" option groups gear not linked to any profile
-- **Add equipment** with fields for category, brand, model, serial number, purchase date, condition, profile, and notes
+- **Add & edit equipment** — fields for category, brand, model, serial number, purchase date, condition, profile, and notes; ✏️ button pre-fills the form for in-place editing
 - **Equipment categories** covering Breathing, Exposure Protection, Vision & Navigation, and Accessories
-- **Condition tracking** — New, Excellent, Good, Fair, or Needs Service
-- **Per-category service countdown** — each item gets a smart service due date based on its type, calculated from the last service date (or purchase date if never serviced):
+- **Condition tracking** — New, Excellent, Good, Fair, Needs Service, or Broken/Malfunction
+- **Sort options** — sort the gear list by name (A→Z / Z→A), condition, next service date, or purchase date
+- **Bulk actions** — select multiple items with checkboxes; bulk delete or reassign to a different profile in one step
+- **Search** — filter your gear list by name, category, or brand
+
+### Service Tracking
+- **Per-category service countdown** — each item gets a smart service due date based on its type:
   - 🔵 Blue — more than 30 days remaining
   - 🟠 Orange — service due within 30 days
   - 🔴 Red — overdue
-- **Edit equipment** — ✏️ button on each card pre-fills the form for in-place editing; cancel at any time without losing changes
-- **Mark as Serviced** — one click resets the countdown from today and clears a "Needs Service" condition
+- **Mark as Serviced** — one click logs the date, resets the countdown, and clears a "Needs Service" / "Broken" condition
+- **Service history log** — every service date is recorded per item; expand the history panel on any card to see the full service timeline
+- **Service calendar** — monthly calendar view highlighting every upcoming service due date; click a day to see which items are due and their current condition
+- **Email reminders** — set multiple reminder thresholds per item (e.g. 30 days, 7 days before service); sent automatically via EmailJS on login
+
+### Overview & Dive Log
+- **Equipment stats card** — live summary at the top of the Equipment tab showing total items, overdue count, due-soon count, and broken count
+- **Dive log** — dedicated Dive Log tab to record dives with date, location, max depth, duration, profile, and notes; filter entries by profile; sorted newest-first
 - **Maintenance guide** — click any gear card to open a step-by-step maintenance guide tailored to that equipment type
-- **Search** — filter your gear list by name, category, or brand
-- **Persistent storage** — gear list and profiles saved in `localStorage` and survive page refreshes
+
+### Dive Map
+- **Interactive map** (Leaflet + OpenStreetMap) showing nearby dive shops, centres, sites, and equipment workshops
+- **Search** any city or location to jump to it (powered by Nominatim geocoder)
+- **Filter** by All, Shops & Centres, Dive Sites, or Workshops
+- **Save favourite locations** — ⭐ Save button in any map popup stores the location to your personal Saved Locations panel for quick access later
+- **Custom pins** — 📌 Add Pin mode lets you click anywhere on the map to place your own named pin with notes; pins are stored per user and persist across sessions
+- **My Location** button to re-centre the map using your browser's geolocation
+- **Retry resilience** — queries four Overpass API mirrors in sequence with per-endpoint timeouts; a ↺ Retry button appears if all mirrors are unavailable
+
+### General
+- **Forgot password** — request a 6-digit reset code sent to your registered email; valid for 15 minutes
+- **Persistent storage** — all data (gear, profiles, dive log, map favourites, custom pins) saved in `localStorage` per user account and survives page refreshes
 
 ---
 
@@ -80,17 +103,31 @@ cd Diving_Assistant
 
 ```
 Diving_Assistant/
-├── index.html      # App layout, auth screen, and equipment form
-├── style.css       # Ocean-themed styles
-├── auth.css        # Login and register screen styles
-├── app.js          # Gear logic, localStorage, service countdown
-├── auth.js         # User registration, login, session management
-└── maintenance.js  # Per-category maintenance instructions
+├── index.html        # App layout, auth screen, equipment form, all panes
+├── style.css         # Ocean-themed design system
+├── auth.css          # Login, register, and forgot-password screen styles
+├── app.js            # Gear logic, profiles, sort, bulk actions, stats, calendar
+├── auth.js           # User registration, login, session, forgot password
+├── dive-log.js       # Dive log storage, rendering, and form handling
+├── map.js            # Leaflet map, Overpass queries, favourites, custom pins
+├── email-service.js  # EmailJS configuration, reminder and reset email senders
+├── gear-data.js      # Searchable brand and model dataset (200+ products)
+└── maintenance.js    # Per-category maintenance instructions
 ```
 
 ---
 
 ## Changelog
+
+### v1.3 — Enhancements
+- **Sort options** — dropdown to sort the gear list by name (A→Z / Z→A), condition (worst first), next service date, or purchase date (newest first)
+- **Service history log** — every ✅ Mark as Serviced action appends the date to a per-item history; expand the "📋 Service History (N)" button on any card to view the full timeline
+- **Bulk actions** — checkboxes on gear cards; selecting any items reveals a sticky action bar with item count, profile reassignment dropdown, bulk delete, and a Clear button
+- **Equipment stats card** — new overview card at the top of the Equipment tab showing live counts for total items, overdue, due-soon (≤30 days), and broken
+- **Service calendar** — new 📅 Calendar tab with a monthly grid; days with items due are marked with a coral dot; click a day to see which items are due and their condition; Prev/Next navigation
+- **Dive log** — new 📓 Dive Log tab; log dives with date, location, max depth (m), duration (min), profile assignment, and notes; filter by profile; sorted newest-first; per-user localStorage storage
+- **Save favourite map locations** — ⭐ Save button added to every map pin popup; saved locations appear in a Saved Locations panel accessible from the map toolbar; 📍 fly-to and 🗑 remove per entry
+- **Custom map pins** — 📌 Add Pin toolbar button enters crosshair mode; click anywhere on the map to place a named pin with optional notes; pins render as 📌 markers with their own popup; stored per user
 
 ### v1.2 — L2 Adventure Design System
 - New **Instrument Serif** display font paired with **Manrope** body font (loaded from Google Fonts)
