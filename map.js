@@ -75,21 +75,24 @@ async function fetchDiveLocations(lat, lon) {
   if (fetchController) fetchController.abort();
   fetchController = new AbortController();
 
-  const radius = 40000; // 40 km
+  const radius = 50000; // 50 km
+  // nwr = node + way + relation — catches shops/centres mapped as buildings or areas too
   const query = `
-[out:json][timeout:25];
+[out:json][timeout:30];
 (
-  node["sport"="diving"](around:${radius},${lat},${lon});
-  way["sport"="diving"](around:${radius},${lat},${lon});
-  node["sport"="scuba_diving"](around:${radius},${lat},${lon});
-  node["shop"="scuba_diving"](around:${radius},${lat},${lon});
-  node["shop"="diving"](around:${radius},${lat},${lon});
-  node["leisure"="dive_centre"](around:${radius},${lat},${lon});
-  node["amenity"="dive_centre"](around:${radius},${lat},${lon});
-  node["tourism"="dive_site"](around:${radius},${lat},${lon});
-  node["craft"="diver"](around:${radius},${lat},${lon});
-  node["repair"="scuba"](around:${radius},${lat},${lon});
-  node["repair"="diving_equipment"](around:${radius},${lat},${lon});
+  nwr["sport"="diving"](around:${radius},${lat},${lon});
+  nwr["sport"="scuba_diving"](around:${radius},${lat},${lon});
+  nwr["sport"="underwater_diving"](around:${radius},${lat},${lon});
+  nwr["shop"="diving"](around:${radius},${lat},${lon});
+  nwr["shop"="scuba_diving"](around:${radius},${lat},${lon});
+  nwr["leisure"="dive_centre"](around:${radius},${lat},${lon});
+  nwr["amenity"="dive_centre"](around:${radius},${lat},${lon});
+  nwr["tourism"="dive_site"](around:${radius},${lat},${lon});
+  nwr["craft"="diver"](around:${radius},${lat},${lon});
+  nwr["repair"="scuba"](around:${radius},${lat},${lon});
+  nwr["repair"="diving_equipment"](around:${radius},${lat},${lon});
+  nwr["dive"="yes"](around:${radius},${lat},${lon});
+  nwr["diving"="yes"](around:${radius},${lat},${lon});
 );
 out center;`.trim();
 
@@ -127,7 +130,12 @@ function classifyFeature(tags) {
   }
   if (
     tags.tourism === 'dive_site' ||
-    (tags.sport === 'diving' && !tags.shop && !tags.leisure && !tags.amenity && !tags.craft)
+    tags.dive === 'yes' ||
+    tags.diving === 'yes' ||
+    (
+      (tags.sport === 'diving' || tags.sport === 'scuba_diving' || tags.sport === 'underwater_diving') &&
+      !tags.shop && !tags.leisure && !tags.amenity && !tags.craft
+    )
   ) {
     return 'site';
   }
@@ -205,7 +213,7 @@ function renderMarkers() {
   const n = mapMarkers.length;
   setMapStatus(
     n === 0
-      ? 'No locations found here — try zooming out or searching a different area.'
+      ? 'No dive locations found in this area — this may mean they aren\'t mapped in OpenStreetMap yet. Try searching a coastal city or dive destination.'
       : `${n} location${n !== 1 ? 's' : ''} found — click a pin for details.`
   );
 }
