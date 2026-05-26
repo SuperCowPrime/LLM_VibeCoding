@@ -252,3 +252,48 @@
 }
 
 .pw-toggle:hover { opacity: 1; }
+
+/* ── Forgot password ─────────────────────────────────────────────────────── */
+
+.forgot-link {
+  text-align: center;
+  margin-top: 14px;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--shallow, #2e86c1);
+  font-size: .85rem;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: opacity .15s;
+}
+
+.link-btn:hover { opacity: .75; }
+
+.forgot-desc {
+  font-size: .88rem;
+  color: var(--text-muted, #717d7e);
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+
+.forgot-back {
+  text-align: center;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--blue-pale, #d6eaf8);
+}
+
+.reset-code-inline {
+  font-size: 1.4rem;
+  letter-spacing: .18em;
+  color: var(--reef-coral, #ff7a59);
+  font-family: monospace;
+  display: inline-block;
+  margin-top: 6px;
+}

@@ -17,9 +17,16 @@
 //  4. Paste your keys into the three fields below.
 //
 const EMAILJS_CONFIG = {
-  publicKey:  'ZNzs5ZWX2I4JCtOP0',   // Account → General → Public Key
-  serviceId:  'service_xe6n7dr',   // Email Services → <your service> → Service ID
-  templateId: 'template_cmh1f9g',  // Email Templates → <your template> → Template ID
+  publicKey:        'ZNzs5ZWX2I4JCtOP0',   // Account → General → Public Key
+  serviceId:        'service_xe6n7dr',      // Email Services → <your service> → Service ID
+  templateId:       'template_cmh1f9g',     // Email Templates → service reminder template
+  resetTemplateId:  'YOUR_RESET_TEMPLATE_ID', // Email Templates → password reset template
+  //
+  // Password-reset template variables:
+  //   {{to_email}}   – recipient address
+  //   {{to_name}}    – username
+  //   {{reset_code}} – 6-digit code
+  //   {{expiry_min}} – "15" (minutes until expiry)
 };
 
 (function initEmailJS() {
@@ -34,12 +41,28 @@ function emailjsReady() {
     EMAILJS_CONFIG.templateId !== 'YOUR_TEMPLATE_ID';
 }
 
+function resetEmailReady() {
+  return emailjsReady() && EMAILJS_CONFIG.resetTemplateId !== 'YOUR_RESET_TEMPLATE_ID';
+}
+
 // Read the stored email for a given username directly from localStorage
 // (no dependency on auth.js so this file can load before it).
 function getUserEmail(username) {
   if (!username) return null;
   const users = JSON.parse(localStorage.getItem('diveUsers') || '{}');
   return users[username]?.email || null;
+}
+
+function sendResetEmail(toEmail, username, code) {
+  if (!resetEmailReady()) {
+    return Promise.reject(new Error('Reset email template not configured.'));
+  }
+  return emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.resetTemplateId, {
+    to_email:   toEmail,
+    to_name:    username,
+    reset_code: code,
+    expiry_min: '15',
+  });
 }
 
 function sendReminderEmail(toEmail, username, item, daysUntil) {

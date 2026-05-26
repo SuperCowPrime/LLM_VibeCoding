@@ -48,7 +48,56 @@
           </div>
           <button type="submit" class="auth-submit">Log In</button>
           <p class="auth-error" id="login-error"></p>
+          <p class="auth-success" id="login-success"></p>
+          <p class="forgot-link"><button type="button" class="link-btn" onclick="showForgot()">Forgot your password?</button></p>
         </form>
+      </div>
+
+      <!-- Forgot Password -->
+      <div class="auth-form-section hidden" id="forgot-form-section">
+
+        <!-- Step 1: enter username -->
+        <div id="forgot-step-1">
+          <p class="forgot-desc">Enter your username and we'll send a 6-digit reset code to your registered email.</p>
+          <div class="form-group">
+            <label for="forgot-username">Username</label>
+            <input type="text" id="forgot-username" autocomplete="username"
+              onkeydown="if(event.key==='Enter') submitForgotStep1()" />
+          </div>
+          <button type="button" id="forgot-send-btn" class="auth-submit" onclick="submitForgotStep1()">Send Reset Code</button>
+          <p class="auth-error" id="forgot-step1-error"></p>
+        </div>
+
+        <!-- Step 2: enter code + new password -->
+        <div id="forgot-step-2" class="hidden">
+          <p class="forgot-desc" id="forgot-sent-msg"></p>
+          <div class="form-group">
+            <label for="forgot-code">Reset Code</label>
+            <input type="text" id="forgot-code" maxlength="6" placeholder="6-digit code"
+              autocomplete="one-time-code" inputmode="numeric"
+              onkeydown="if(event.key==='Enter') submitForgotStep2()" />
+          </div>
+          <div class="form-group">
+            <label for="forgot-new-password">New Password</label>
+            <div class="pw-wrapper">
+              <input type="password" id="forgot-new-password" autocomplete="new-password" />
+              <button type="button" class="pw-toggle" aria-label="Toggle password visibility"
+                onclick="togglePassword('forgot-new-password', this)">👁</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="forgot-confirm-password">Confirm New Password</label>
+            <div class="pw-wrapper">
+              <input type="password" id="forgot-confirm-password" autocomplete="new-password" />
+              <button type="button" class="pw-toggle" aria-label="Toggle password visibility"
+                onclick="togglePassword('forgot-confirm-password', this)">👁</button>
+            </div>
+          </div>
+          <button type="button" class="auth-submit" onclick="submitForgotStep2()">Reset Password</button>
+          <p class="auth-error" id="forgot-step2-error"></p>
+        </div>
+
+        <p class="forgot-back"><button type="button" class="link-btn" onclick="showLogin()">← Back to Login</button></p>
       </div>
 
       <!-- Register -->

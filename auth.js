@@ -54,6 +54,59 @@ function togglePassword(inputId, btn) {
   btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
 }
 
+// ── Password Reset ────────────────────────────────────────────────────────────
+
+function getResets() {
+  return JSON.parse(localStorage.getItem('diveResets') || '{}');
+}
+
+function saveResets(resets) {
+  localStorage.setItem('diveResets', JSON.stringify(resets));
+}
+
+function generateResetCode(username) {
+  const users = getUsers();
+  if (!users[username]) return { ok: false, error: 'Username not found.' };
+  const code    = Math.floor(100000 + Math.random() * 900000).toString();
+  const expires = Date.now() + 15 * 60 * 1000; // 15 min
+  const resets  = getResets();
+  resets[username] = { code, expires };
+  saveResets(resets);
+  return { ok: true, code, email: users[username].email || '' };
+}
+
+function validateResetCode(username, code) {
+  const resets = getResets();
+  const entry  = resets[username];
+  if (!entry) return { ok: false, error: 'No reset request found. Please start over.' };
+  if (Date.now() > entry.expires) {
+    delete resets[username];
+    saveResets(resets);
+    return { ok: false, error: 'Reset code has expired. Please request a new one.' };
+  }
+  if (entry.code !== code.trim()) return { ok: false, error: 'Incorrect code. Try again.' };
+  delete resets[username];
+  saveResets(resets);
+  return { ok: true };
+}
+
+async function resetPassword(username, newPassword) {
+  const users = getUsers();
+  if (!users[username]) return { ok: false, error: 'User not found.' };
+  users[username].passwordHash = await hashPassword(newPassword);
+  saveUsers(users);
+  return { ok: true };
+}
+
+function maskEmail(email) {
+  if (!email) return 'your registered email';
+  const [user, domain] = email.split('@');
+  const masked = user.length <= 2
+    ? user[0] + '**'
+    : user[0] + '***' + user[user.length - 1];
+  return masked + '@' + domain;
+}
+
 // ── UI ──────────────────────────────────────────────────────────────────────
 
 const authScreen  = document.getElementById('auth-screen');
@@ -75,15 +128,101 @@ function showAuth() {
 }
 
 function switchTab(tab) {
+  document.getElementById('forgot-form-section').classList.add('hidden');
   document.getElementById('login-tab').classList.toggle('active', tab === 'login');
   document.getElementById('register-tab').classList.toggle('active', tab === 'register');
   document.getElementById('login-form-section').classList.toggle('hidden', tab !== 'login');
   document.getElementById('register-form-section').classList.toggle('hidden', tab !== 'register');
-  // Clear errors on the tab being switched to
   if (tab === 'login') document.getElementById('login-error').textContent = '';
   if (tab === 'register') {
     document.getElementById('register-error').textContent = '';
     document.getElementById('register-success').textContent = '';
+  }
+}
+
+function showForgot() {
+  document.getElementById('login-form-section').classList.add('hidden');
+  document.getElementById('register-form-section').classList.add('hidden');
+  document.getElementById('login-tab').classList.remove('active');
+  document.getElementById('register-tab').classList.remove('active');
+  document.getElementById('forgot-form-section').classList.remove('hidden');
+  // Reset to step 1
+  document.getElementById('forgot-step-1').classList.remove('hidden');
+  document.getElementById('forgot-step-2').classList.add('hidden');
+  document.getElementById('forgot-username').value = '';
+  document.getElementById('forgot-step1-error').textContent = '';
+}
+
+function showLogin() {
+  document.getElementById('forgot-form-section').classList.add('hidden');
+  switchTab('login');
+}
+
+async function submitForgotStep1() {
+  const username = document.getElementById('forgot-username').value.trim();
+  const errorEl  = document.getElementById('forgot-step1-error');
+  const btn      = document.getElementById('forgot-send-btn');
+  errorEl.textContent = '';
+
+  if (!username) { errorEl.textContent = 'Please enter your username.'; return; }
+
+  const result = generateResetCode(username);
+  if (!result.ok) { errorEl.textContent = result.error; return; }
+
+  const { code, email } = result;
+  let sentViaEmail = false;
+
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+
+  if (email && typeof sendResetEmail === 'function') {
+    try {
+      await sendResetEmail(email, username, code);
+      sentViaEmail = true;
+    } catch (e) {
+      console.warn('[Dive Gear] Reset email failed:', e);
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Send Reset Code';
+
+  const msgEl = document.getElementById('forgot-sent-msg');
+  msgEl.innerHTML = sentViaEmail
+    ? `A 6-digit code was sent to <strong>${maskEmail(email)}</strong>. It expires in 15 minutes.`
+    : `EmailJS is not configured — your reset code is: <strong class="reset-code-inline">${code}</strong>`;
+
+  document.getElementById('forgot-step-1').classList.add('hidden');
+  document.getElementById('forgot-step-2').classList.remove('hidden');
+  document.getElementById('forgot-code').value = '';
+  document.getElementById('forgot-new-password').value = '';
+  document.getElementById('forgot-confirm-password').value = '';
+  document.getElementById('forgot-step2-error').textContent = '';
+}
+
+async function submitForgotStep2() {
+  const username   = document.getElementById('forgot-username').value.trim();
+  const code       = document.getElementById('forgot-code').value.trim();
+  const newPwd     = document.getElementById('forgot-new-password').value;
+  const confirmPwd = document.getElementById('forgot-confirm-password').value;
+  const errorEl    = document.getElementById('forgot-step2-error');
+  errorEl.textContent = '';
+
+  if (!code)              { errorEl.textContent = 'Please enter the reset code.'; return; }
+  if (newPwd.length < 6)  { errorEl.textContent = 'Password must be at least 6 characters.'; return; }
+  if (newPwd !== confirmPwd) { errorEl.textContent = 'Passwords do not match.'; return; }
+
+  const validation = validateResetCode(username, code);
+  if (!validation.ok) { errorEl.textContent = validation.error; return; }
+
+  await resetPassword(username, newPwd);
+
+  showLogin();
+  document.getElementById('login-username').value = username;
+  const successEl = document.getElementById('login-success');
+  if (successEl) {
+    successEl.textContent = '✅ Password reset! You can now log in.';
+    setTimeout(() => { successEl.textContent = ''; }, 5000);
   }
 }
 
