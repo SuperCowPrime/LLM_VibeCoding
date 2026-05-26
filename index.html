@@ -159,12 +159,38 @@
     <!-- ── App tab navigation — floating pill capsules ────────────── -->
     <nav class="app-tab-nav">
       <button class="app-tab active" data-tab="equipment" onclick="switchAppTab('equipment')"><span class="ic">🗂</span> Equipment</button>
-      <button class="app-tab" data-tab="map" onclick="switchAppTab('map')"><span class="ic">🗺</span> Dive Map</button>
+      <button class="app-tab" data-tab="divelog"   onclick="switchAppTab('divelog')"><span class="ic">📓</span> Dive Log</button>
+      <button class="app-tab" data-tab="calendar"  onclick="switchAppTab('calendar')"><span class="ic">📅</span> Calendar</button>
+      <button class="app-tab" data-tab="map"       onclick="switchAppTab('map')"><span class="ic">🗺</span> Dive Map</button>
     </nav>
 
     <!-- ── Equipment pane ──────────────────────────────────────────── -->
     <div id="equipment-pane">
     <main>
+
+      <!-- Summary Stats -->
+      <section class="card stats-card" id="stats-section">
+        <div class="card-eyebrow">Overview</div>
+        <h2>Equipment <span class="em">Stats</span></h2>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value" id="stat-total">0</div>
+            <div class="stat-label">Total Items</div>
+          </div>
+          <div class="stat-item stat-overdue">
+            <div class="stat-value" id="stat-overdue">0</div>
+            <div class="stat-label">Overdue</div>
+          </div>
+          <div class="stat-item stat-soon">
+            <div class="stat-value" id="stat-soon">0</div>
+            <div class="stat-label">Due Soon</div>
+          </div>
+          <div class="stat-item stat-broken">
+            <div class="stat-value" id="stat-broken">0</div>
+            <div class="stat-label">Broken</div>
+          </div>
+        </div>
+      </section>
 
       <!-- Profiles -->
       <section class="card" id="profiles-section">
@@ -317,9 +343,28 @@
         <div class="card-eyebrow">Equipment List</div>
         <div class="section-header">
           <h2>My <span class="em">Gear</span> <span id="gear-count" class="badge">0</span></h2>
-          <input type="text" id="search" placeholder="Search gear..." class="search-input" />
+          <div class="gear-controls">
+            <input type="text" id="search" placeholder="Search gear..." class="search-input" />
+            <select id="sort-select" onchange="setSort(this.value)" title="Sort gear list" class="sort-select">
+              <option value="default">Sort: Default</option>
+              <option value="name-asc">Name A → Z</option>
+              <option value="name-desc">Name Z → A</option>
+              <option value="condition">Condition</option>
+              <option value="next-service">Next Service</option>
+              <option value="purchase-date">Purchase Date</option>
+            </select>
+          </div>
         </div>
         <div id="profile-filter" class="profile-filter"></div>
+
+        <!-- Bulk action bar -->
+        <div id="bulk-action-bar" class="bulk-action-bar hidden">
+          <span id="bulk-count">0 items selected</span>
+          <select id="bulk-profile-select" class="bulk-profile-select"></select>
+          <button class="btn-secondary btn-sm" onclick="bulkReassign()">Reassign Profile</button>
+          <button class="btn-danger btn-sm" onclick="bulkDelete()">🗑 Delete Selected</button>
+          <button class="btn-secondary btn-sm" onclick="clearBulkSelection()">✕ Clear</button>
+        </div>
 
         <div id="gear-list" class="gear-list">
           <p class="empty-state">No equipment added yet. Use the form above to add your first item.</p>
@@ -327,6 +372,87 @@
       </section>
     </main>
     </div><!-- end #equipment-pane -->
+
+    <!-- ── Dive Log pane ─────────────────────────────────────────────── -->
+    <div id="divelog-pane" class="hidden">
+    <main>
+      <section class="card">
+        <div class="card-eyebrow">Logbook</div>
+        <h2>My <span class="em">Dive Log</span></h2>
+
+        <!-- Profile filter -->
+        <div class="dive-log-controls">
+          <label for="dive-log-profile">Filter by profile:</label>
+          <select id="dive-log-profile" onchange="setDiveLogProfile(this.value)">
+            <option value="">All Profiles</option>
+          </select>
+        </div>
+
+        <!-- Add dive form -->
+        <div class="dive-add-card">
+          <h3>Log a <span class="em">Dive</span></h3>
+          <form id="dive-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="dive-date">Date <span class="required">*</span></label>
+                <input type="date" id="dive-date" name="dive-date" required />
+              </div>
+              <div class="form-group">
+                <label for="dive-location">Location <span class="required">*</span></label>
+                <input type="text" id="dive-location" name="dive-location" placeholder="e.g. Great Barrier Reef" required />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="dive-depth">Max Depth (m)</label>
+                <input type="number" id="dive-depth" name="dive-depth" min="0" max="330" step="0.1" placeholder="e.g. 18" />
+              </div>
+              <div class="form-group">
+                <label for="dive-duration">Duration (min)</label>
+                <input type="number" id="dive-duration" name="dive-duration" min="1" max="600" placeholder="e.g. 45" />
+              </div>
+            </div>
+            <div class="form-group full-width">
+              <label for="dive-profile">Assign to Profile</label>
+              <select id="dive-profile" name="dive-profile">
+                <option value="">— No profile —</option>
+              </select>
+            </div>
+            <div class="form-group full-width">
+              <label for="dive-notes">Notes</label>
+              <textarea id="dive-notes" name="dive-notes" rows="2" placeholder="Conditions, visibility, buddy, highlights…"></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">📓 Log Dive</button>
+              <button type="reset" class="btn-secondary">Clear</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Dive list -->
+        <div id="dive-log-list" class="dive-log-list">
+          <p class="empty-state">No dives logged yet. Use the form above to add your first dive!</p>
+        </div>
+      </section>
+    </main>
+    </div><!-- end #divelog-pane -->
+
+    <!-- ── Calendar pane ──────────────────────────────────────────────── -->
+    <div id="calendar-pane" class="hidden">
+    <main>
+      <section class="card">
+        <div class="card-eyebrow">Service Schedule</div>
+        <h2>Service <span class="em">Calendar</span></h2>
+        <div class="calendar-nav">
+          <button class="btn-secondary" onclick="calNavMonth(-1)">&#8249; Prev</button>
+          <span id="calendar-month-label" class="calendar-month-label"></span>
+          <button class="btn-secondary" onclick="calNavMonth(1)">Next &#8250;</button>
+        </div>
+        <div id="calendar-grid" class="calendar-grid"></div>
+        <div id="calendar-detail" class="calendar-detail"></div>
+      </section>
+    </main>
+    </div><!-- end #calendar-pane -->
 
     <!-- ── Map pane ────────────────────────────────────────────────── -->
     <div id="map-pane" class="hidden">
@@ -336,6 +462,8 @@
             onkeydown="if(event.key==='Enter') mapSearch()" />
           <button class="btn-primary map-search-btn" onclick="mapSearch()">🔍 Search</button>
           <button class="btn-secondary map-locate-btn" onclick="mapLocateMe()" title="Use my location">📍 My Location</button>
+          <button class="btn-secondary map-locate-btn" onclick="toggleFavouritesPanel()" title="Saved locations">⭐ Saved</button>
+          <button class="btn-secondary map-locate-btn" id="add-pin-btn" onclick="toggleAddPinMode()" title="Add a custom pin">📌 Add Pin</button>
         </div>
         <div class="map-filter-row">
           <button class="map-filter-btn active" data-filter="all"      onclick="setMapFilter('all')">All</button>
@@ -344,6 +472,15 @@
           <button class="map-filter-btn"         data-filter="workshop" onclick="setMapFilter('workshop')">🔧 Workshops</button>
         </div>
         <p class="map-status" id="map-status"></p>
+
+        <!-- Saved locations panel -->
+        <div id="map-favourites-panel" class="map-favourites-panel hidden">
+          <div class="map-fav-header">
+            <span>⭐ Saved Locations</span>
+            <button class="map-fav-close" onclick="toggleFavouritesPanel()">✕</button>
+          </div>
+          <div id="map-favourites-list" class="map-favourites-list"></div>
+        </div>
       </div>
       <div id="map"></div>
     </div><!-- end #map-pane -->
@@ -376,6 +513,7 @@
   <script src="gear-data.js"></script>
   <script src="email-service.js"></script>
   <script src="map.js"></script>
+  <script src="dive-log.js"></script>
   <script src="auth.js"></script>
 </body>
 </html>
